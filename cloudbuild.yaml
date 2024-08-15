@@ -1,0 +1,22 @@
+steps:
+# Build the container image
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['build', '-t', 'gcr.io/serverlessproject-430420/serverless-sdp18:latest', 'frontend/dal-vacation-home']
+# Push the container image to Container Registry
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['push', 'gcr.io/serverlessproject-430420/serverless-sdp18:latest']
+# Deploy container image to Cloud Run
+- name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  entrypoint: gcloud
+  args:
+    - 'run'
+    - 'deploy'
+    - 'dalvacationhome-sdp18'
+    - '--image'
+    - 'gcr.io/serverlessproject-430420/serverless-sdp18:latest'
+    - '--region'
+    - 'us-east1'
+    - '--platform'
+    - 'managed'
+options:
+  logging: CLOUD_LOGGING_ONLY

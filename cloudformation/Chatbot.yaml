@@ -1,0 +1,172 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'AWS CloudFormation Template for Lex Chatbot with Detailed Intents and Lambda Integration'
+
+Resources:
+  # Lambda Function to fetch booking details
+  BookingDetailsLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: GetBookingDetailsLambda
+      Handler: index.lambda_handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        ZipFile: |
+          import json
+          import requests
+          def get_booking_details_from_api(booking_reference):
+              api_url = f"https://vrnylsjiye.execute-api.us-east-1.amazonaws.com/prod/booking/{booking_reference}"
+              response = requests.get(api_url)
+              if response.status_code == 200:
+                  return response.json()
+              else:
+                  print(f"Error fetching booking details: {response.status_code}, {response.text}")
+                  return None
+          def validate(slots):
+              if not slots['BookingReference']:
+                  return {'isValid': False, 'violatedSlot': 'BookingReference'}
+              return {'isValid': True}
+          def lambda_handler(event, context):
+              print("Event: ", json.dumps(event))
+              slots = event['sessionState']['intent']['slots']
+              intent = event['sessionState']['intent']['name']
+              validation_result = validate(slots)
+              if event['invocationSource'] == 'DialogCodeHook':
+                  if not validation_result['isValid']:
+                      return {"sessionState": {"dialogAction": {'slotToElicit': validation_result['violatedSlot'], "type": "ElicitSlot"}, "intent": {'name': intent, 'slots': slots}}}
+                  return {"sessionState": {"dialogAction": {"type": "Delegate"}, "intent": {'name': intent, 'slots': slots}}}
+              if event['invocationSource'] == 'FulfillmentCodeHook':
+                  booking_reference = slots['BookingReference']['value']['originalValue']
+                  booking_details = get_booking_details_from_api(booking_reference)
+                  if booking_details and booking_details.get('Count', 0) > 0:
+                      item = booking_details['Items'][0]
+                      response_message = f"Booking details:\\nBooking Reference: {item.get('bookingReferenceNumber', {}).get('S', 'N/A')}\\nProperty ID: {item.get('propertyId', {}).get('S', 'N/A')}\\n..."
+                  else:
+                      response_message = f"Sorry, I could not find any booking with reference number {booking_reference}"
+                  return {"sessionState": {"dialogAction": {"type": "Close"}, "intent": {'name': intent, 'slots': slots, 'state': 'Fulfilled'}}, "messages": [{"contentType": "PlainText", "content": response_message}]}
+      Runtime: python3.8
+      Timeout: 30
+
+  # Lambda execution role
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Policies:
+        - PolicyName: LambdaPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                  - lex:PostText
+                Resource: '*'
+
+  # Lex Bot
+  ChatBot:
+    Type: AWS::Lex::Bot
+    Properties:
+      Name: VacationHomeAssistant
+      Description: 'A chatbot for DAL Vacation Home.'
+      Intents:
+        - IntentName: !Ref BookRoomIntent
+          IntentVersion: $LATEST
+        - IntentName: !Ref CustomerConcernIntent
+          IntentVersion: $LATEST
+        - IntentName: !Ref InitialFlowIntent
+          IntentVersion: $LATEST
+        - IntentName: !Ref BookingDetailsIntent
+          IntentVersion: $LATEST
+      ClarificationPrompt:
+        Messages:
+          - ContentType: 'PlainText'
+            Content: 'Sorry, can you please repeat that?'
+        MaxAttempts: 5
+      AbortStatement:
+        Messages:
+          - ContentType: 'PlainText'
+            Content: 'Sorry, I am not able to understand.'
+      IdleSessionTTLInSeconds: 300
+      Locale: en_US
+      ChildDirected: false
+      VoiceId: 'Joanna'
+
+  # Lex Intent Definitions
+  BookRoomIntent:
+    Type: AWS::Lex::Intent
+    Properties:
+      Name: 'BookRoom'
+      Description: 'Intent to handle room booking queries.'
+      SampleUtterances:
+        - 'I want to book a room.'
+        - 'How can I book a room?'
+      FulfillmentActivity:
+        Type: 'ReturnIntent'
+
+  CustomerConcernIntent:
+    Type: AWS::Lex::Intent
+    Properties:
+      Name: 'CustomerConcern'
+      Description: 'Intent to handle customer concerns.'
+      SampleUtterances:
+        - 'I have an issue with my room.'
+        - 'I need to report a problem.'
+        - 'I am facing issues'
+      FulfillmentActivity:
+        Type: 'ReturnIntent'
+
+  InitialFlowIntent:
+    Type: AWS::Lex::Intent
+    Properties:
+      Name: 'InitialFlow'
+      Description: 'Intent for initial greetings and navigation.'
+      SampleUtterances:
+        - 'Hi'
+        - 'Hello'
+        - 'Help'
+        - 'Guide me'
+      FulfillmentActivity:
+        Type: 'ReturnIntent'
+
+  BookingDetailsIntent:
+    Type: AWS::Lex::Intent
+    Properties:
+      Name: 'BookingDetails'
+      Description: 'Intent to fetch booking details from the Lambda function.'
+      SampleUtterances:
+        - 'I want to check my booking details'
+        - 'Can you provide my booking details?'
+      Slots:
+        - Name: 'BookingReference'
+          Description: 'Used to capture booking reference number.'
+          SlotType: 'AMAZON.Number'
+          SlotConstraint: 'Required'
+          ValueElicitationPrompt:
+            Messages:
+              - ContentType: 'PlainText'
+                Content: 'Please enter your booking reference number.'
+            MaxAttempts: 3
+      FulfillmentActivity:
+        Type: 'CodeHook'
+        CodeHook:
+          Uri: !GetAtt BookingDetailsLambda.Arn
+          MessageVersion: '1.0'
+
+Outputs:
+  ChatbotLambdaFunctionArn:
+    Description: 'ARN of the Lambda function for handling chatbot.'
+    Value: !GetAtt BookingDetailsLambda.Arn
+
+  LexBotArn:
+    Description: 'ARN of the Lex Bot.'
+    Value: !Ref ChatBot

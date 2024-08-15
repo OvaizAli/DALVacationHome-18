@@ -1,0 +1,1515 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'DynamoDB Tables and Rest APIs'
+
+Parameters:
+  LabRoleARN:
+    Default: arn:aws:iam::626446205647:role/LabRole
+    Description: Lab role arn
+    Type: String
+
+Resources:
+  ## DynamoDB Tables
+  UserTable:
+    Type: AWS::DynamoDB::Table
+    Properties: 
+      AttributeDefinitions: 
+        - 
+          AttributeName: "email"
+          AttributeType: "S"
+      KeySchema: 
+        - 
+          AttributeName: "email"
+          KeyType: "HASH"
+      ProvisionedThroughput: 
+        ReadCapacityUnits: "5"
+        WriteCapacityUnits: "5"
+      TableName: "user" 
+
+  PropertyTable:
+    Type: AWS::DynamoDB::Table
+    Properties: 
+      AttributeDefinitions: 
+        - 
+          AttributeName: "propertyId"
+          AttributeType: "S"
+      KeySchema: 
+        - 
+          AttributeName: "propertyId"
+          KeyType: "HASH"
+      ProvisionedThroughput: 
+        ReadCapacityUnits: "5"
+        WriteCapacityUnits: "5"
+      TableName: "property" 
+
+  ReviewTable:
+    Type: AWS::DynamoDB::Table
+    Properties: 
+      AttributeDefinitions: 
+        - 
+          AttributeName: "reviewId"
+          AttributeType: "S"
+      KeySchema: 
+        - 
+          AttributeName: "reviewId"
+          KeyType: "HASH"
+      ProvisionedThroughput: 
+        ReadCapacityUnits: "5"
+        WriteCapacityUnits: "5"
+      TableName: "review" 
+
+  ConcernTable:
+    Type: AWS::DynamoDB::Table
+    Properties: 
+      AttributeDefinitions: 
+        - 
+          AttributeName: "concernId"
+          AttributeType: "S"
+      KeySchema: 
+        - 
+          AttributeName: "concernId"
+          KeyType: "HASH"
+      ProvisionedThroughput: 
+        ReadCapacityUnits: "5"
+        WriteCapacityUnits: "5"
+      TableName: "concern" 
+
+  BookingTable:
+    Type: AWS::DynamoDB::Table
+    Properties: 
+      AttributeDefinitions: 
+        - 
+          AttributeName: "bookingReferenceNumber"
+          AttributeType: "S"
+      KeySchema: 
+        - 
+          AttributeName: "bookingReferenceNumber"
+          KeyType: "HASH"
+      ProvisionedThroughput: 
+        ReadCapacityUnits: "5"
+        WriteCapacityUnits: "5"
+      TableName: "booking" 
+  
+  ## API Gateway Rest APIs
+  DalVacationHomeAPIs:
+    Type: 'AWS::ApiGateway::RestApi'
+    Properties:
+      Name: 'DalVacationHomeAPIs'
+
+  ## User Resource and Methods
+  UserResource:
+    Type: 'AWS::ApiGateway::Resource'
+    Properties:
+      ParentId: !GetAtt
+        - DalVacationHomeAPIs
+        - RootResourceId
+      PathPart: 'user'
+      RestApiId: !Ref DalVacationHomeAPIs
+
+  OptionsMethodUserResource:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref DalVacationHomeAPIs
+      ResourceId: !Ref UserResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        IntegrationResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+            method.response.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
+            method.response.header.Access-Control-Allow-Origin: "'https://dalvacationhome-sdp18-3en3jcc6tq-ue.a.run.app'"
+          ResponseTemplates:
+            application/json: ''
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        Type: MOCK
+      MethodResponses:
+      - StatusCode: 200
+        ResponseModels:
+          application/json: 'Empty'
+        ResponseParameters:
+          method.response.header.Access-Control-Allow-Headers: false
+          method.response.header.Access-Control-Allow-Methods: false
+          method.response.header.Access-Control-Allow-Origin: false
+
+  GetAllUsersMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref DalVacationHomeAPIs
+      ResourceId: !Ref UserResource
+      HttpMethod: GET
+      AuthorizationType: NONE
+      Integration:
+        IntegrationHttpMethod: 'POST'
+        Type: AWS
+        Credentials: !Ref LabRoleARN
+        Uri:
+          Fn::Sub: arn:aws:apigateway:${AWS::Region}:dynamodb:action/Scan
+        RequestTemplates:
+          application/json: |
+            {
+              "TableName": "user"
+            }
+        IntegrationResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: "'https://dalvacationhome-sdp18-3en3jcc6tq-ue.a.run.app'"
+          ResponseTemplates:
+            application/json: ''
+      MethodResponses:
+      - StatusCode: 200
+        ResponseParameters:
+          method.response.header.Access-Control-Allow-Origin: false
+    
+  SaveUserMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref DalVacationHomeAPIs
+      ResourceId: !Ref UserResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        IntegrationHttpMethod: 'POST'
+        Type: AWS
+        Credentials: !Ref LabRoleARN
+        Uri:
+          Fn::Sub: arn:aws:apigateway:${AWS::Region}:dynamodb:action/PutItem
+        RequestTemplates:
+          application/json: |
+            {
+              "TableName": "user",
+              "Item": {
+                "email": {
+                    "S": "$input.path('$.email')"
+                },
+                "firstname": {
+                    "S": "$input.path('$.firstname')"
+                },
+                "lastname": {
+                    "S": "$input.path('$.lastname')"
+                },
+                "securityQuestions": {
+                    "S": "$input.path('$.securityQuestions')"
+                },
+                "cipherText": {
+                    "S": "$input.path('$.cipherText')"
+                },
+                "role": {
+                    "S": "$input.path('$.role')"
+                },
+                "isLoggedIn": {
+                    "BOOL": "$input.path('$.isLoggedIn')"
+                }
+              }
+            }
+        IntegrationResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: "'https://dalvacationhome-sdp18-3en3jcc6tq-ue.a.run.app'"
+          ResponseTemplates:
+            application/json: ''
+      MethodResponses:
+      - StatusCode: 200
+        ResponseParameters:
+          method.response.header.Access-Control-Allow-Origin: false
+
+  ## User Resource and Methods For Fetching user based on email
+  UserResourceEmail:
+    Type: 'AWS::ApiGateway::Resource'
+    Properties:
+      ParentId: !Ref UserResource
+      PathPart: '{email}'
+      RestApiId: !Ref DalVacationHomeAPIs
+  
+  OptionsMethodUserResourceEmail:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref DalVacationHomeAPIs
+      ResourceId: !Ref UserResourceEmail
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        IntegrationResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+            method.response.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
+            method.response.header.Access-Control-Allow-Origin: "'https://dalvacationhome-sdp18-3en3jcc6tq-ue.a.run.app'"
+          ResponseTemplates:
+            application/json: ''
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        Type: MOCK
+      MethodResponses:
+      - StatusCode: 200
+        ResponseModels:
+          application/json: 'Empty'
+        ResponseParameters:
+          method.response.header.Access-Control-Allow-Headers: false
+          method.response.header.Access-Control-Allow-Methods: false
+          method.response.header.Access-Control-Allow-Origin: false
+
+  GetAllUsersBasedOnEmailMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref DalVacationHomeAPIs
+      ResourceId: !Ref UserResourceEmail
+      HttpMethod: GET
+      AuthorizationType: NONE
+      Integration:
+        IntegrationHttpMethod: 'POST'
+        Type: AWS
+        Credentials: !Ref LabRoleARN
+        Uri:
+          Fn::Sub: arn:aws:apigateway:${AWS::Region}:dynamodb:action/Query
+        RequestTemplates:
+          application/json: |
+            {
+              "TableName": "user",
+              "KeyConditionExpression": "email = :v1",
+              "ExpressionAttributeValues": {
+                  ":v1": {
+                      "S": "$input.params('email')"
+                  }
+              }
+            }
+        IntegrationResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: "'https://dalvacationhome-sdp18-3en3jcc6tq-ue.a.run.app'"
+          ResponseTemplates:
+            application/json: ''
+      MethodResponses:
+      - StatusCode: 200
+        ResponseParameters:
+          method.response.header.Access-Control-Allow-Origin: false
+
+  ## User Resource and Methods for setting isLoggedIn based on email
+  UserResourceSetIsLoggedIn:
+    Type: 'AWS::ApiGateway::Resource'
+    Properties:
+      ParentId: !Ref UserResource
+      PathPart: 'setlogin'
+      RestApiId: !Ref DalVacationHomeAPIs
+  
+  OptionsMethodUserResourceSetIsLoggedIn:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref DalVacationHomeAPIs
+      ResourceId: !Ref UserResourceSetIsLoggedIn
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        IntegrationResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+            method.response.header.Access-Control-Allow-Methods: "'PUT,OPTIONS'"
+            method.response.header.Access-Control-Allow-Origin: "'https://dalvacationhome-sdp18-3en3jcc6tq-ue.a.run.app'"
+          ResponseTemplates:
+            application/json: ''
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        Type: MOCK
+      MethodResponses:
+      - StatusCode: 200
+        ResponseModels:
+          application/json: 'Empty'
+        ResponseParameters:
+          method.response.header.Access-Control-Allow-Headers: false
+          method.response.header.Access-Control-Allow-Methods: false
+          method.response.header.Access-Control-Allow-Origin: false
+
+  SetIsLoggedInMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref DalVacationHomeAPIs
+      ResourceId: !Ref UserResourceSetIsLoggedIn
+      HttpMethod: PUT
+      AuthorizationType: NONE
+      Integration:
+        IntegrationHttpMethod: 'POST'
+        Type: AWS
+        Credentials: !Ref LabRoleARN
+        Uri:
+          Fn::Sub: arn:aws:apigateway:${AWS::Region}:dynamodb:action/UpdateItem
+        RequestTemplates:
+          application/json: |
+            {
+              "TableName":"user",
+              "Key":{
+                  "email":{
+                    "S":"$input.path('$.email')"
+                  }
+              },
+              "UpdateExpression":"SET isLoggedIn = :isLoggedIn",
+              "ExpressionAttributeValues":{
+                  ":isLoggedIn":{
+                    "BOOL":"$input.path('$.isLoggedIn')"
+                  }
+              }
+            }
+        IntegrationResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: "'https://dalvacationhome-sdp18-3en3jcc6tq-ue.a.run.app'"
+          ResponseTemplates:
+            application/json: ''
+      MethodResponses:
+      - StatusCode: 200
+        ResponseParameters:
+          method.response.header.Access-Control-Allow-Origin: false
+
+  ## Property Resource and Methods
+  PropertyResource:
+    Type: 'AWS::ApiGateway::Resource'
+    Properties:
+      ParentId: !GetAtt
+        - DalVacationHomeAPIs
+        - RootResourceId
+      PathPart: 'property'
+      RestApiId: !Ref DalVacationHomeAPIs
+
+  OptionsMethodPropertyResource:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref DalVacationHomeAPIs
+      ResourceId: !Ref PropertyResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        IntegrationResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+            method.response.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
+            method.response.header.Access-Control-Allow-Origin: "'https://dalvacationhome-sdp18-3en3jcc6tq-ue.a.run.app'"
+          ResponseTemplates:
+            application/json: ''
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        Type: MOCK
+      MethodResponses:
+      - StatusCode: 200
+        ResponseModels:
+          application/json: 'Empty'
+        ResponseParameters:
+          method.response.header.Access-Control-Allow-Headers: false
+          method.response.header.Access-Control-Allow-Methods: false
+          method.response.header.Access-Control-Allow-Origin: false
+
+  GetAllPropertiesMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref DalVacationHomeAPIs
+      ResourceId: !Ref PropertyResource
+      HttpMethod: GET
+      AuthorizationType: NONE
+      Integration:
+        IntegrationHttpMethod: 'POST'
+        Type: AWS
+        Credentials: !Ref LabRoleARN
+        Uri:
+          Fn::Sub: arn:aws:apigateway:${AWS::Region}:dynamodb:action/Scan
+        RequestTemplates:
+          application/json: |
+            {
+              "TableName": "property"
+            }
+        IntegrationResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: "'https://dalvacationhome-sdp18-3en3jcc6tq-ue.a.run.app'"
+          ResponseTemplates:
+            application/json: ''
+      MethodResponses:
+      - StatusCode: 200
+        ResponseParameters:
+          method.response.header.Access-Control-Allow-Origin: false
+  
+  SavePropertyMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref DalVacationHomeAPIs
+      ResourceId: !Ref PropertyResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        IntegrationHttpMethod: 'POST'
+        Type: AWS
+        Credentials: !Ref LabRoleARN
+        Uri:
+          Fn::Sub: arn:aws:apigateway:${AWS::Region}:dynamodb:action/PutItem
+        RequestTemplates:
+          application/json: |
+            {
+              "TableName": "property",
+              "Item": {
+                "propertyId": {
+                    "S": "$input.path('$.propertyId')"
+                },
+                "agentPool": {
+                    "S": "$input.path('$.agentPool')"
+                },
+                "features": {
+                    "S": "$input.path('$.features')"
+                },
+                "occupancy": {
+                    "N": "$input.path('$.occupancy')"
+                },
+                "ownerId": {
+                    "S": "$input.path('$.ownerId')"
+                },
+                "roomNumber": {
+                    "N": "$input.path('$.roomNumber')"
+                },
+                "roomType": {
+                    "S": "$input.path('$.roomType')"
+                }
+              }
+            }
+        IntegrationResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: "'https://dalvacationhome-sdp18-3en3jcc6tq-ue.a.run.app'"
+          ResponseTemplates:
+            application/json: ''
+      MethodResponses:
+      - StatusCode: 200
+        ResponseParameters:
+          method.response.header.Access-Control-Allow-Origin: false
+
+  ## Review Resource and Methods
+  ReviewResource:
+    Type: 'AWS::ApiGateway::Resource'
+    Properties:
+      ParentId: !GetAtt
+        - DalVacationHomeAPIs
+        - RootResourceId
+      PathPart: 'review'
+      RestApiId: !Ref DalVacationHomeAPIs
+
+  OptionsMethodReviewResource:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref DalVacationHomeAPIs
+      ResourceId: !Ref ReviewResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        IntegrationResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+            method.response.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
+            method.response.header.Access-Control-Allow-Origin: "'https://dalvacationhome-sdp18-3en3jcc6tq-ue.a.run.app'"
+          ResponseTemplates:
+            application/json: ''
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        Type: MOCK
+      MethodResponses:
+      - StatusCode: 200
+        ResponseModels:
+          application/json: 'Empty'
+        ResponseParameters:
+          method.response.header.Access-Control-Allow-Headers: false
+          method.response.header.Access-Control-Allow-Methods: false
+          method.response.header.Access-Control-Allow-Origin: false
+
+  GetAllReviewsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref DalVacationHomeAPIs
+      ResourceId: !Ref ReviewResource
+      HttpMethod: GET
+      AuthorizationType: NONE
+      Integration:
+        IntegrationHttpMethod: 'POST'
+        Type: AWS
+        Credentials: !Ref LabRoleARN
+        Uri:
+          Fn::Sub: arn:aws:apigateway:${AWS::Region}:dynamodb:action/Scan
+        RequestTemplates:
+          application/json: |
+            {
+              "TableName": "review"
+            }
+        IntegrationResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: "'https://dalvacationhome-sdp18-3en3jcc6tq-ue.a.run.app'"
+          ResponseTemplates:
+            application/json: ''
+      MethodResponses:
+      - StatusCode: 200
+        ResponseParameters:
+          method.response.header.Access-Control-Allow-Origin: false
+  
+  SaveReviewMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref DalVacationHomeAPIs
+      ResourceId: !Ref ReviewResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        IntegrationHttpMethod: 'POST'
+        Type: AWS
+        Credentials: !Ref LabRoleARN
+        Uri:
+          Fn::Sub: arn:aws:apigateway:${AWS::Region}:dynamodb:action/PutItem
+        RequestTemplates:
+          application/json: |
+            {
+              "TableName": "review",
+              "Item": {
+                "reviewId": {
+                    "S": "$input.path('$.reviewId')"
+                },
+                "date": {
+                    "S": "$input.path('$.date')"
+                },
+                "rating": {
+                    "N": "$input.path('$.rating')"
+                },
+                "message": {
+                    "S": "$input.path('$.message')"
+                },
+                "roomNumber": {
+                    "N": "$input.path('$.roomNumber')"
+                },
+                "userId": {
+                    "S": "$input.path('$.userId')"
+                }
+              }
+            }
+        IntegrationResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: "'https://dalvacationhome-sdp18-3en3jcc6tq-ue.a.run.app'"
+          ResponseTemplates:
+            application/json: ''
+      MethodResponses:
+      - StatusCode: 200
+        ResponseParameters:
+          method.response.header.Access-Control-Allow-Origin: false
+  
+  ## Concern Resource and Methods
+  ConcernResource:
+    Type: 'AWS::ApiGateway::Resource'
+    Properties:
+      ParentId: !GetAtt
+        - DalVacationHomeAPIs
+        - RootResourceId
+      PathPart: 'concern'
+      RestApiId: !Ref DalVacationHomeAPIs
+
+  OptionsMethodConcernResource:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref DalVacationHomeAPIs
+      ResourceId: !Ref ConcernResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        IntegrationResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+            method.response.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
+            method.response.header.Access-Control-Allow-Origin: "'https://dalvacationhome-sdp18-3en3jcc6tq-ue.a.run.app'"
+          ResponseTemplates:
+            application/json: ''
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        Type: MOCK
+      MethodResponses:
+      - StatusCode: 200
+        ResponseModels:
+          application/json: 'Empty'
+        ResponseParameters:
+          method.response.header.Access-Control-Allow-Headers: false
+          method.response.header.Access-Control-Allow-Methods: false
+          method.response.header.Access-Control-Allow-Origin: false
+
+  GetAllConcernsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref DalVacationHomeAPIs
+      ResourceId: !Ref ConcernResource
+      HttpMethod: GET
+      AuthorizationType: NONE
+      Integration:
+        IntegrationHttpMethod: 'POST'
+        Type: AWS
+        Credentials: !Ref LabRoleARN
+        Uri:
+          Fn::Sub: arn:aws:apigateway:${AWS::Region}:dynamodb:action/Scan
+        RequestTemplates:
+          application/json: |
+            {
+              "TableName": "concern"
+            }
+        IntegrationResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: "'https://dalvacationhome-sdp18-3en3jcc6tq-ue.a.run.app'"
+          ResponseTemplates:
+            application/json: ''
+      MethodResponses:
+      - StatusCode: 200
+        ResponseParameters:
+          method.response.header.Access-Control-Allow-Origin: false
+  
+  SaveConcernMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref DalVacationHomeAPIs
+      ResourceId: !Ref ConcernResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        IntegrationHttpMethod: 'POST'
+        Type: AWS
+        Credentials: !Ref LabRoleARN
+        Uri:
+          Fn::Sub: arn:aws:apigateway:${AWS::Region}:dynamodb:action/PutItem
+        RequestTemplates:
+          application/json: |
+            {
+              "TableName": "concern",
+              "Item": {
+                "concernId": {
+                    "S": "$input.path('$.concernId')"
+                },
+                "agentId": {
+                    "S": "$input.path('$.agentId')"
+                },
+                "bookingReferenceNumber": {
+                    "S": "$input.path('$.bookingReferenceNumber')"
+                },
+                "date": {
+                    "S": "$input.path('$.date')"
+                },
+                "message": {
+                    "S": "$input.path('$.message')"
+                },
+                "response": {
+                    "S": "$input.path('$.response')"
+                },
+                "status": {
+                    "S": "$input.path('$.status')"
+                },
+                "userId": {
+                    "S": "$input.path('$.userId')"
+                }
+              }
+            }
+        IntegrationResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: "'https://dalvacationhome-sdp18-3en3jcc6tq-ue.a.run.app'"
+          ResponseTemplates:
+            application/json: ''
+      MethodResponses:
+      - StatusCode: 200
+        ResponseParameters:
+          method.response.header.Access-Control-Allow-Origin: false
+
+  ## Booking Resource and Methods
+  BookingResource:
+    Type: 'AWS::ApiGateway::Resource'
+    Properties:
+      ParentId: !GetAtt
+        - DalVacationHomeAPIs
+        - RootResourceId
+      PathPart: 'booking'
+      RestApiId: !Ref DalVacationHomeAPIs
+
+  OptionsMethodBookingResource:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref DalVacationHomeAPIs
+      ResourceId: !Ref BookingResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        IntegrationResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+            method.response.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
+            method.response.header.Access-Control-Allow-Origin: "'https://dalvacationhome-sdp18-3en3jcc6tq-ue.a.run.app'"
+          ResponseTemplates:
+            application/json: ''
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        Type: MOCK
+      MethodResponses:
+      - StatusCode: 200
+        ResponseModels:
+          application/json: 'Empty'
+        ResponseParameters:
+          method.response.header.Access-Control-Allow-Headers: false
+          method.response.header.Access-Control-Allow-Methods: false
+          method.response.header.Access-Control-Allow-Origin: false
+
+  GetAllBookingsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref DalVacationHomeAPIs
+      ResourceId: !Ref BookingResource
+      HttpMethod: GET
+      AuthorizationType: NONE
+      Integration:
+        IntegrationHttpMethod: 'POST'
+        Type: AWS
+        Credentials: !Ref LabRoleARN
+        Uri:
+          Fn::Sub: arn:aws:apigateway:${AWS::Region}:dynamodb:action/Scan
+        RequestTemplates:
+          application/json: |
+            {
+              "TableName": "booking"
+            }
+        IntegrationResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: "'https://dalvacationhome-sdp18-3en3jcc6tq-ue.a.run.app'"
+          ResponseTemplates:
+            application/json: ''
+      MethodResponses:
+      - StatusCode: 200
+        ResponseParameters:
+          method.response.header.Access-Control-Allow-Origin: false
+  
+  SaveBookingMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref DalVacationHomeAPIs
+      ResourceId: !Ref BookingResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        IntegrationHttpMethod: 'POST'
+        Type: AWS
+        Credentials: !Ref LabRoleARN
+        Uri:
+          Fn::Sub: arn:aws:apigateway:${AWS::Region}:dynamodb:action/PutItem
+        RequestTemplates:
+          application/json: |
+            {
+              "TableName": "booking",
+              "Item": {
+                "bookingReferenceNumber": {
+                    "S": "$input.path('$.bookingReferenceNumber')"
+                },
+                "propertyId": {
+                    "S": "$input.path('$.propertyId')"
+                },
+                "roomNumber": {
+                    "N": "$input.path('$.roomNumber')"
+                },
+                "userId": {
+                    "S": "$input.path('$.userId')"
+                },
+                "fromDate": {
+                    "S": "$input.path('$.fromDate')"
+                },
+                "toDate": {
+                    "S": "$input.path('$.toDate')"
+                },
+                "isApproved": {
+                    "BOOL": "$input.path('$.isApproved')"
+                },
+                "agentId": {
+                    "S": "$input.path('$.agentId')"
+                },
+                "creationDate": {
+                    "S": "$input.path('$.creationDate')"
+                }
+              }
+            }
+        IntegrationResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: "'https://dalvacationhome-sdp18-3en3jcc6tq-ue.a.run.app'"
+          ResponseTemplates:
+            application/json: ''
+      MethodResponses:
+      - StatusCode: 200
+        ResponseParameters:
+          method.response.header.Access-Control-Allow-Origin: false
+
+  ## Booking Resource and Methods For Fetching bookings based on bookingReferenceNumber
+  BookingResourceBookingReferenceNumber:
+    Type: 'AWS::ApiGateway::Resource'
+    Properties:
+      ParentId: !Ref BookingResource
+      PathPart: '{bookingReferenceNumber}'
+      RestApiId: !Ref DalVacationHomeAPIs
+  
+  OptionsMethodBookingResourceBookingReferenceNumber:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref DalVacationHomeAPIs
+      ResourceId: !Ref BookingResourceBookingReferenceNumber
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        IntegrationResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+            method.response.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
+            method.response.header.Access-Control-Allow-Origin: "'https://dalvacationhome-sdp18-3en3jcc6tq-ue.a.run.app'"
+          ResponseTemplates:
+            application/json: ''
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        Type: MOCK
+      MethodResponses:
+      - StatusCode: 200
+        ResponseModels:
+          application/json: 'Empty'
+        ResponseParameters:
+          method.response.header.Access-Control-Allow-Headers: false
+          method.response.header.Access-Control-Allow-Methods: false
+          method.response.header.Access-Control-Allow-Origin: false
+
+  GetAllBookingsBasedOnBookingReferenceNumber:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref DalVacationHomeAPIs
+      ResourceId: !Ref BookingResourceBookingReferenceNumber
+      HttpMethod: GET
+      AuthorizationType: NONE
+      Integration:
+        IntegrationHttpMethod: 'POST'
+        Type: AWS
+        Credentials: !Ref LabRoleARN
+        Uri:
+          Fn::Sub: arn:aws:apigateway:${AWS::Region}:dynamodb:action/Query
+        RequestTemplates:
+          application/json: |
+            {
+              "TableName": "booking",
+              "KeyConditionExpression": "bookingReferenceNumber = :v1",
+              "ExpressionAttributeValues": {
+                  ":v1": {
+                      "S": "$input.params('bookingReferenceNumber')"
+                  }
+              }
+            }
+        IntegrationResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: "'https://dalvacationhome-sdp18-3en3jcc6tq-ue.a.run.app'"
+          ResponseTemplates:
+            application/json: ''
+      MethodResponses:
+      - StatusCode: 200
+        ResponseParameters:
+          method.response.header.Access-Control-Allow-Origin: false
+
+  DeleteBookingBasedOnBookingReferenceNumber:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref DalVacationHomeAPIs
+      ResourceId: !Ref BookingResourceBookingReferenceNumber
+      HttpMethod: DELETE
+      AuthorizationType: NONE
+      Integration:
+        IntegrationHttpMethod: 'POST'
+        Type: AWS
+        Credentials: !Ref LabRoleARN
+        Uri:
+          Fn::Sub: arn:aws:apigateway:${AWS::Region}:dynamodb:action/DeleteItem
+        RequestTemplates:
+          application/json: |
+            {
+              "TableName":"booking",
+              "Key":{
+                  "bookingReferenceNumber":{
+                    "S": "$input.params('bookingReferenceNumber')"
+                  }
+              }
+            }
+        IntegrationResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: "'https://dalvacationhome-sdp18-3en3jcc6tq-ue.a.run.app'"
+          ResponseTemplates:
+            application/json: ''
+      MethodResponses:
+      - StatusCode: 200
+        ResponseParameters:
+          method.response.header.Access-Control-Allow-Origin: false
+  
+  ## Booking Resource and Methods for fetching data based on agentId and isApproved flag
+  BookingResourceAgentIdIsApproved:
+    Type: 'AWS::ApiGateway::Resource'
+    Properties:
+      ParentId: !Ref BookingResource
+      PathPart: 'agentbookings'
+      RestApiId: !Ref DalVacationHomeAPIs
+
+  OptionsMethodBookingResourceAgentIdIsApproved:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref DalVacationHomeAPIs
+      ResourceId: !Ref BookingResourceAgentIdIsApproved
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        IntegrationResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+            method.response.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
+            method.response.header.Access-Control-Allow-Origin: "'https://dalvacationhome-sdp18-3en3jcc6tq-ue.a.run.app'"
+          ResponseTemplates:
+            application/json: ''
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        Type: MOCK
+      MethodResponses:
+      - StatusCode: 200
+        ResponseModels:
+          application/json: 'Empty'
+        ResponseParameters:
+          method.response.header.Access-Control-Allow-Headers: false
+          method.response.header.Access-Control-Allow-Methods: false
+          method.response.header.Access-Control-Allow-Origin: false
+
+  GetAllBookingsMethodBasedOnAgentIdIsApproved:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref DalVacationHomeAPIs
+      ResourceId: !Ref BookingResourceAgentIdIsApproved
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        IntegrationHttpMethod: 'POST'
+        Type: AWS
+        Credentials: !Ref LabRoleARN
+        Uri:
+          Fn::Sub: arn:aws:apigateway:${AWS::Region}:dynamodb:action/Scan
+        RequestTemplates:
+          application/json: |
+            {
+              "TableName": "booking",
+              "FilterExpression": "agentId = :agentId AND isApproved = :isApproved",
+              "ExpressionAttributeValues": {
+                ":agentId": {
+                    "S": "$input.path('$.agentId')"
+                },
+                ":isApproved": {
+                    "BOOL": "$input.path('$.isApproved')"
+                }
+              }
+            }
+        IntegrationResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: "'https://dalvacationhome-sdp18-3en3jcc6tq-ue.a.run.app'"
+          ResponseTemplates:
+            application/json: ''
+      MethodResponses:
+      - StatusCode: 200
+        ResponseParameters:
+          method.response.header.Access-Control-Allow-Origin: false
+
+  ## Booking Resource and Methods For setting isApproved Flag based on bookingReferenceNumber
+  BookingResourceSetIsApprovedFlag:
+    Type: 'AWS::ApiGateway::Resource'
+    Properties:
+      ParentId: !Ref BookingResource
+      PathPart: 'setIsApproved'
+      RestApiId: !Ref DalVacationHomeAPIs
+  
+  OptionsMethodBookingResourceSetIsApprovedFlag:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref DalVacationHomeAPIs
+      ResourceId: !Ref BookingResourceSetIsApprovedFlag
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        IntegrationResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+            method.response.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
+            method.response.header.Access-Control-Allow-Origin: "'https://dalvacationhome-sdp18-3en3jcc6tq-ue.a.run.app'"
+          ResponseTemplates:
+            application/json: ''
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        Type: MOCK
+      MethodResponses:
+      - StatusCode: 200
+        ResponseModels:
+          application/json: 'Empty'
+        ResponseParameters:
+          method.response.header.Access-Control-Allow-Headers: false
+          method.response.header.Access-Control-Allow-Methods: false
+          method.response.header.Access-Control-Allow-Origin: false
+
+  SetIsApprovedFlagBasedOnBookingReferenceNumber:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref DalVacationHomeAPIs
+      ResourceId: !Ref BookingResourceSetIsApprovedFlag
+      HttpMethod: PUT
+      AuthorizationType: NONE
+      Integration:
+        IntegrationHttpMethod: 'POST'
+        Type: AWS
+        Credentials: !Ref LabRoleARN
+        Uri:
+          Fn::Sub: arn:aws:apigateway:${AWS::Region}:dynamodb:action/UpdateItem
+        RequestTemplates:
+          application/json: |
+            {
+              "TableName":"booking",
+              "Key":{
+                  "bookingReferenceNumber":{
+                    "S":"$input.path('$.bookingReferenceNumber')"
+                  }
+              },
+              "UpdateExpression":"SET isApproved = :isApproved",
+              "ExpressionAttributeValues":{
+                  ":isApproved":{
+                    "BOOL":"$input.path('$.isApproved')"
+                  }
+              }
+            }
+        IntegrationResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: "'https://dalvacationhome-sdp18-3en3jcc6tq-ue.a.run.app'"
+          ResponseTemplates:
+            application/json: ''
+      MethodResponses:
+      - StatusCode: 200
+        ResponseParameters:
+          method.response.header.Access-Control-Allow-Origin: false
+
+  ## Booking Resource and Methods For setting agent and creation date based on bookingReferenceNumber
+  BookingResourceSetAgentAndCreationDate:
+    Type: 'AWS::ApiGateway::Resource'
+    Properties:
+      ParentId: !Ref BookingResource
+      PathPart: 'setAgent'
+      RestApiId: !Ref DalVacationHomeAPIs
+  
+  OptionsMethodBookingResourceSetAgentAndCreationDate:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref DalVacationHomeAPIs
+      ResourceId: !Ref BookingResourceSetAgentAndCreationDate
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        IntegrationResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+            method.response.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
+            method.response.header.Access-Control-Allow-Origin: "'https://dalvacationhome-sdp18-3en3jcc6tq-ue.a.run.app'"
+          ResponseTemplates:
+            application/json: ''
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        Type: MOCK
+      MethodResponses:
+      - StatusCode: 200
+        ResponseModels:
+          application/json: 'Empty'
+        ResponseParameters:
+          method.response.header.Access-Control-Allow-Headers: false
+          method.response.header.Access-Control-Allow-Methods: false
+          method.response.header.Access-Control-Allow-Origin: false
+
+  SetAgentAndCreationDateBasedOnBookingReferenceNumber:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref DalVacationHomeAPIs
+      ResourceId: !Ref BookingResourceSetAgentAndCreationDate
+      HttpMethod: PUT
+      AuthorizationType: NONE
+      Integration:
+        IntegrationHttpMethod: 'POST'
+        Type: AWS
+        Credentials: !Ref LabRoleARN
+        Uri:
+          Fn::Sub: arn:aws:apigateway:${AWS::Region}:dynamodb:action/UpdateItem
+        RequestTemplates:
+          application/json: |
+            {
+                "TableName": "booking",
+                "Key": {
+                    "bookingReferenceNumber": {
+                        "S": "$input.path('$.bookingReferenceNumber')"
+                    }
+                },
+                "UpdateExpression": "SET agentId = :agentId, creationDate = :creationDate",
+                "ExpressionAttributeValues": {
+                    ":agentId": {
+                        "S": "$input.path('$.agentId')"
+                    },
+                    ":creationDate": {
+                        "S": "$input.path('$.creationDate')"
+                    }
+                }
+            }
+        IntegrationResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: "'https://dalvacationhome-sdp18-3en3jcc6tq-ue.a.run.app'"
+          ResponseTemplates:
+            application/json: ''
+      MethodResponses:
+      - StatusCode: 200
+        ResponseParameters:
+          method.response.header.Access-Control-Allow-Origin: false
+
+  ## Booking Resource and Methods for fetching data based on userId
+  BookingResourceUserId:
+    Type: 'AWS::ApiGateway::Resource'
+    Properties:
+      ParentId: !Ref BookingResource
+      PathPart: 'userbookings'
+      RestApiId: !Ref DalVacationHomeAPIs
+
+  OptionsMethodBookingResourceUserId:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref DalVacationHomeAPIs
+      ResourceId: !Ref BookingResourceUserId
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        IntegrationResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+            method.response.header.Access-Control-Allow-Methods: "'GET,POST,OPTIONS'"
+            method.response.header.Access-Control-Allow-Origin: "'https://dalvacationhome-sdp18-3en3jcc6tq-ue.a.run.app'"
+          ResponseTemplates:
+            application/json: ''
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        Type: MOCK
+      MethodResponses:
+      - StatusCode: 200
+        ResponseModels:
+          application/json: 'Empty'
+        ResponseParameters:
+          method.response.header.Access-Control-Allow-Headers: false
+          method.response.header.Access-Control-Allow-Methods: false
+          method.response.header.Access-Control-Allow-Origin: false
+
+  GetAllBookingsMethodBasedOnUserId:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref DalVacationHomeAPIs
+      ResourceId: !Ref BookingResourceUserId
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        IntegrationHttpMethod: 'POST'
+        Type: AWS
+        Credentials: !Ref LabRoleARN
+        Uri:
+          Fn::Sub: arn:aws:apigateway:${AWS::Region}:dynamodb:action/Scan
+        RequestTemplates:
+          application/json: |
+            {
+              "TableName": "booking",
+              "FilterExpression": "userId = :userId",
+              "ExpressionAttributeValues": {
+                ":userId": {
+                    "S": "$input.path('$.userId')"
+                }
+              }
+            }
+        IntegrationResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: "'https://dalvacationhome-sdp18-3en3jcc6tq-ue.a.run.app'"
+          ResponseTemplates:
+            application/json: ''
+      MethodResponses:
+      - StatusCode: 200
+        ResponseParameters:
+          method.response.header.Access-Control-Allow-Origin: false
+  
+  ## Lambda functions for User Authentication
+  SecondFactorAuthLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: second-factor-auth
+      Handler: second.factor.auth.SecondFactorAuthLambdaRequestHandler
+      Role: !Ref LabRoleARN
+      Code:
+        S3Bucket: dal-vacation-home
+        S3Key: second-factor-auth-0.0.1-SNAPSHOT.jar
+      Runtime: java17
+      Timeout: 120
+
+  ThirdFactorAuthLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: third-factor-auth
+      Handler: third.factor.auth.ThirdFactorAuthLambdaRequestHandler
+      Role: !Ref LabRoleARN
+      Code:
+        S3Bucket: dal-vacation-home
+        S3Key: third-factor-auth-0.0.1-SNAPSHOT.jar
+      Runtime: java17
+      Timeout: 120
+
+  ## Rest APIs for Lambda functions
+  LambdaResource:
+    Type: 'AWS::ApiGateway::Resource'
+    Properties:
+      ParentId: !GetAtt
+        - DalVacationHomeAPIs
+        - RootResourceId
+      PathPart: 'lambda'
+      RestApiId: !Ref DalVacationHomeAPIs
+
+  # Second factor auth lambda resource and method
+  SecondFactorAuthLambdaResource:
+    Type: 'AWS::ApiGateway::Resource'
+    Properties:
+      ParentId: !Ref LambdaResource
+      PathPart: 'secondfactorauth'
+      RestApiId: !Ref DalVacationHomeAPIs
+
+  OptionsMethodSecondFactorAuthLambdaResource:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref DalVacationHomeAPIs
+      ResourceId: !Ref SecondFactorAuthLambdaResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        IntegrationResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+            method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+            method.response.header.Access-Control-Allow-Origin: "'https://dalvacationhome-sdp18-3en3jcc6tq-ue.a.run.app'"
+          ResponseTemplates:
+            application/json: ''
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        Type: MOCK
+      MethodResponses:
+      - StatusCode: 200
+        ResponseModels:
+          application/json: 'Empty'
+        ResponseParameters:
+          method.response.header.Access-Control-Allow-Headers: false
+          method.response.header.Access-Control-Allow-Methods: false
+          method.response.header.Access-Control-Allow-Origin: false
+
+  SecondFactorAuthMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref DalVacationHomeAPIs
+      ResourceId: !Ref SecondFactorAuthLambdaResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        IntegrationHttpMethod: 'POST'
+        Type: AWS
+        PassthroughBehavior: WHEN_NO_MATCH
+        Credentials: !Ref LabRoleARN
+        Uri: !Sub
+          - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaFunctionArn}/invocations
+          - LambdaFunctionArn: !GetAtt SecondFactorAuthLambdaFunction.Arn
+        IntegrationResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: "'https://dalvacationhome-sdp18-3en3jcc6tq-ue.a.run.app'"
+          ResponseTemplates:
+            application/json: ''
+      MethodResponses:
+      - StatusCode: 200
+        ResponseParameters:
+          method.response.header.Access-Control-Allow-Origin: false
+
+  # Third factor auth lambda resource and method
+  ThirdFactorAuthLambdaResource:
+    Type: 'AWS::ApiGateway::Resource'
+    Properties:
+      ParentId: !Ref LambdaResource
+      PathPart: 'thirdfactorauth'
+      RestApiId: !Ref DalVacationHomeAPIs
+
+  OptionsMethodThirdFactorAuthLambdaResource:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref DalVacationHomeAPIs
+      ResourceId: !Ref ThirdFactorAuthLambdaResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        IntegrationResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+            method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+            method.response.header.Access-Control-Allow-Origin: "'https://dalvacationhome-sdp18-3en3jcc6tq-ue.a.run.app'"
+          ResponseTemplates:
+            application/json: ''
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        Type: MOCK
+      MethodResponses:
+      - StatusCode: 200
+        ResponseModels:
+          application/json: 'Empty'
+        ResponseParameters:
+          method.response.header.Access-Control-Allow-Headers: false
+          method.response.header.Access-Control-Allow-Methods: false
+          method.response.header.Access-Control-Allow-Origin: false
+
+  ThirdFactorAuthMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref DalVacationHomeAPIs
+      ResourceId: !Ref ThirdFactorAuthLambdaResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        IntegrationHttpMethod: 'POST'
+        Type: AWS
+        PassthroughBehavior: WHEN_NO_MATCH
+        Credentials: !Ref LabRoleARN
+        Uri: !Sub
+          - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaFunctionArn}/invocations
+          - LambdaFunctionArn: !GetAtt ThirdFactorAuthLambdaFunction.Arn
+        IntegrationResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: "'https://dalvacationhome-sdp18-3en3jcc6tq-ue.a.run.app'"
+          ResponseTemplates:
+            application/json: ''
+      MethodResponses:
+      - StatusCode: 200
+        ResponseParameters:
+          method.response.header.Access-Control-Allow-Origin: false
+
+  ## Deploying Rest APIs
+  Deployment:
+    DependsOn: 
+      - OptionsMethodUserResource
+      - GetAllUsersMethod
+      - SaveUserMethod
+      - OptionsMethodUserResourceEmail
+      - GetAllUsersBasedOnEmailMethod
+      - OptionsMethodUserResourceSetIsLoggedIn
+      - SetIsLoggedInMethod
+      - OptionsMethodPropertyResource
+      - GetAllPropertiesMethod
+      - SavePropertyMethod
+      - OptionsMethodReviewResource
+      - GetAllReviewsMethod
+      - SaveReviewMethod
+      - OptionsMethodConcernResource
+      - GetAllConcernsMethod
+      - SaveConcernMethod
+      - OptionsMethodBookingResource
+      - GetAllBookingsMethod
+      - SaveBookingMethod
+	    - OptionsMethodBookingResourceBookingReferenceNumber
+	    - GetAllBookingsBasedOnBookingReferenceNumber
+      - OptionsMethodBookingResourceAgentIdIsApproved
+      - GetAllBookingsMethodBasedOnAgentIdIsApproved
+	    - OptionsMethodBookingResourceSetIsApprovedFlag
+	    - SetIsApprovedFlagBasedOnBookingReferenceNumber
+	    - OptionsMethodBookingResourceSetAgentAndCreationDate
+	    - SetAgentAndCreationDateBasedOnBookingReferenceNumber
+	    - OptionsMethodBookingResourceUserId
+	    - GetAllBookingsMethodBasedOnUserId
+      - OptionsMethodSecondFactorAuthLambdaResource
+      - SecondFactorAuthMethod
+      - OptionsMethodThirdFactorAuthLambdaResource
+      - ThirdFactorAuthMethod
+      - DeleteBookingBasedOnBookingReferenceNumber
+    Type: 'AWS::ApiGateway::Deployment'
+    Properties:
+      RestApiId: !Ref DalVacationHomeAPIs
+      StageName: prod
+
+  ## Cognito User Pool
+  CognitoUserPool:
+    Type: "AWS::Cognito::UserPool"
+    Properties: 
+      UserPoolName: "DalVacationHomeUserPool"
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+          RequireUppercase: true
+      AutoVerifiedAttributes:
+        - email
+      UsernameAttributes:
+        - email
+      Schema:
+        - AttributeDataType: "String"
+          Name: "email"
+          Required: true
+          Mutable: false
+      MfaConfiguration: "OFF"
+      VerificationMessageTemplate:
+        DefaultEmailOption: "CONFIRM_WITH_CODE"
+        EmailMessage: "Your verification code for registering with DalVacationHome is {####}"
+        EmailSubject: "DalVacationHome Verification Code"
+  
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      UserPoolId: !Ref CognitoUserPool
+      ClientName: DalVacationHomeUserPoolClient
+      GenerateSecret: false
+      ExplicitAuthFlows:
+        - ADMIN_NO_SRP_AUTH
+        - USER_PASSWORD_AUTH
+      SupportedIdentityProviders:
+        - COGNITO
+
+Outputs:
+  ApiUrl:
+    Value:
+      Fn::Sub: 'https://${DalVacationHomeAPIs}.execute-api.${AWS::Region}.amazonaws.com/prod'
+    Description: 'URL for the API Gateway REST API'
+  UserPoolId:
+    Description: ID of the created Cognito User Pool
+    Value: !Ref CognitoUserPool
+  UserPoolClientId:
+    Description: ID of the created Cognito User Pool Client
+    Value: !Ref UserPoolClient

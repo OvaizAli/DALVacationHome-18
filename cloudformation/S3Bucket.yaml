@@ -1,0 +1,9 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Cloudformation for creating bucket to store lambda code'
+Resources:
+  BlogAppBucket:
+    Type: 'AWS::S3::Bucket'
+    DeletionPolicy: Retain
+    Properties:
+      BucketName: dal-vacation-home
+  

@@ -1,0 +1,242 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Notification Module'
+
+Parameters:
+  LambdaRoleARN:
+    Default: arn:aws:iam::058264108348:role/service-role/create-subscription-role-cqi8ywst
+    Type: String
+  APIGatewayRoleARN:
+    Default: arn:aws:iam::058264108348:role/AWSGatewayRoleForSQS
+    Type: String
+
+Resources:
+  
+  ## Create Subscription
+  # Lambda functions
+  CreateSubscriptionLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: create-subscription
+      Handler: create.subscription.CreateSubscriptionLambdaRequestHandler
+      Role: !Ref LambdaRoleARN
+      Code:
+        S3Bucket: dal-vacation-home-notification
+        S3Key: create-subscription-0.0.1-SNAPSHOT.jar
+      Runtime: java17
+      Timeout: 120
+
+  # SQS queue
+  CreateSubscriptionSQSQueue: 
+    Type: AWS::SQS::Queue
+    Properties: 
+      QueueName: create-subscription-queue
+      VisibilityTimeout: 120
+  
+  # Lambda trigger from SQS queue
+  CreateSubscriptionLambdaTrigger:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      EventSourceArn: !GetAtt CreateSubscriptionSQSQueue.Arn
+      FunctionName: !Ref CreateSubscriptionLambdaFunction
+      Enabled: true
+
+  ## Publish Message
+  # Lambda functions
+  PublishMessageLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: publish-message
+      Handler: publish.message.PublishMessageLambdaRequestHandler
+      Role: !Ref LambdaRoleARN
+      Code:
+        S3Bucket: dal-vacation-home-notification
+        S3Key: publish-message-0.0.1-SNAPSHOT.jar
+      Runtime: java17
+      Timeout: 120
+
+  # SQS queue
+  PublishMessageSQSQueue: 
+    Type: AWS::SQS::Queue
+    Properties: 
+      QueueName: publish-message-queue
+      VisibilityTimeout: 120
+  
+  # Lambda trigger from SQS queue
+  PublishMessageLambdaTrigger:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      EventSourceArn: !GetAtt PublishMessageSQSQueue.Arn
+      FunctionName: !Ref PublishMessageLambdaFunction
+      Enabled: true
+
+  ## API Gateway Rest APIs for Notification Module
+  NotificationAPIs:
+    Type: 'AWS::ApiGateway::RestApi'
+    Properties:
+      Name: 'NotificationAPIs'
+  
+  # Create Subscription
+  CreateSubscriptionResource:
+    Type: 'AWS::ApiGateway::Resource'
+    Properties:
+      ParentId: !GetAtt
+        - NotificationAPIs
+        - RootResourceId
+      PathPart: 'createsubscription'
+      RestApiId: !Ref NotificationAPIs
+
+  CreateSubscriptionPathResource:
+    Type: 'AWS::ApiGateway::Resource'
+    Properties:
+      ParentId: !Ref CreateSubscriptionResource
+      PathPart: '{message}'
+      RestApiId: !Ref NotificationAPIs
+
+  CreateSubscriptionOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref NotificationAPIs
+      ResourceId: !Ref CreateSubscriptionPathResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        IntegrationResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+            method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
+            method.response.header.Access-Control-Allow-Origin: "'http://localhost:3000'"
+          ResponseTemplates:
+            application/json: ''
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        Type: MOCK
+      MethodResponses:
+      - StatusCode: 200
+        ResponseModels:
+          application/json: 'Empty'
+        ResponseParameters:
+          method.response.header.Access-Control-Allow-Headers: false
+          method.response.header.Access-Control-Allow-Methods: false
+          method.response.header.Access-Control-Allow-Origin: false
+
+  CreateSubscriptionSendMessageMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref NotificationAPIs
+      ResourceId: !Ref CreateSubscriptionPathResource
+      HttpMethod: GET
+      AuthorizationType: NONE
+      Integration:
+        IntegrationHttpMethod: 'POST'
+        Type: AWS
+        Credentials: !Ref APIGatewayRoleARN
+        Uri: arn:aws:apigateway:us-east-1:sqs:path/058264108348/create-subscription-queue
+        RequestParameters:
+          integration.request.header.Content-Type: "'application/x-www-form-urlencoded'"
+        RequestTemplates:
+          application/json: |
+            Action=SendMessage&MessageBody=$input.params('message')
+        IntegrationResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: "'http://localhost:3000'"
+          ResponseTemplates:
+            application/json: ''
+      MethodResponses:
+      - StatusCode: 200
+        ResponseParameters:
+          method.response.header.Access-Control-Allow-Origin: false
+
+  # Publish Message
+  PublishMessageResource:
+    Type: 'AWS::ApiGateway::Resource'
+    Properties:
+      ParentId: !GetAtt
+        - NotificationAPIs
+        - RootResourceId
+      PathPart: 'publishmessage'
+      RestApiId: !Ref NotificationAPIs
+
+  PublishMessagePathResource:
+    Type: 'AWS::ApiGateway::Resource'
+    Properties:
+      ParentId: !Ref PublishMessageResource
+      PathPart: '{message}'
+      RestApiId: !Ref NotificationAPIs
+
+  PublishMessageOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref NotificationAPIs
+      ResourceId: !Ref PublishMessagePathResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        IntegrationResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+            method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
+            method.response.header.Access-Control-Allow-Origin: "'http://localhost:3000'"
+          ResponseTemplates:
+            application/json: ''
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        Type: MOCK
+      MethodResponses:
+      - StatusCode: 200
+        ResponseModels:
+          application/json: 'Empty'
+        ResponseParameters:
+          method.response.header.Access-Control-Allow-Headers: false
+          method.response.header.Access-Control-Allow-Methods: false
+          method.response.header.Access-Control-Allow-Origin: false
+
+  PublishMessageSendMessageMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref NotificationAPIs
+      ResourceId: !Ref PublishMessagePathResource
+      HttpMethod: GET
+      AuthorizationType: NONE
+      Integration:
+        IntegrationHttpMethod: 'POST'
+        Type: AWS
+        Credentials: !Ref APIGatewayRoleARN
+        Uri: arn:aws:apigateway:us-east-1:sqs:path/058264108348/publish-message-queue
+        RequestParameters:
+          integration.request.header.Content-Type: "'application/x-www-form-urlencoded'"
+        RequestTemplates:
+          application/json: |
+            Action=SendMessage&MessageBody=$input.params('message')
+        IntegrationResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: "'http://localhost:3000'"
+          ResponseTemplates:
+            application/json: ''
+      MethodResponses:
+      - StatusCode: 200
+        ResponseParameters:
+          method.response.header.Access-Control-Allow-Origin: false
+
+  ## Deploying Rest APIs
+  Deployment:
+    DependsOn: 
+      - CreateSubscriptionOptionsMethod
+      - CreateSubscriptionSendMessageMethod
+      - PublishMessageOptionsMethod
+      - PublishMessageSendMessageMethod
+    Type: 'AWS::ApiGateway::Deployment'
+    Properties:
+      RestApiId: !Ref NotificationAPIs
+      StageName: prod
+
+Outputs:
+  ApiUrl:
+    Value:
+      Fn::Sub: 'https://${NotificationAPIs}.execute-api.${AWS::Region}.amazonaws.com/prod'
+    Description: 'URL for the API Gateway REST API'
